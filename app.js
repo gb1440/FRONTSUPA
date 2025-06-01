@@ -1,80 +1,93 @@
-const productList = document.querySelector('#products');
-const addProductForm = document.querySelector('#add-product-form');
-const updateProductForm = document.querySelector('#update-product-form');
-const updateProductId = document.querySelector('#update-id');
-const updateProductName = document.querySelector('#update-name');
-const updateProductPrice = document.querySelector('#update-price');
+const API_URL = 'http://IP_DA_VM_BACKEND:3000/produtos';
+const form = document.getElementById('formProduto');
+const lista = document.getElementById('listaProdutos');
+const mensagem = document.getElementById('mensagem');
 
-// Function to fetch all products from the server
-async function fetchProducts() {
-  const response = await fetch('http://localhost:3000/products');
-  const products = await response.json();
+let produtoEditando = null;
 
-  // Clear product list
-  productList.innerHTML = '';
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const produto = {
+    nome: form.nome.value,
+    descricao: form.descricao.value,
+    preco: parseFloat(form.preco.value),
+    estoque: parseInt(form.estoque.value)
+  };
 
-  // Add each product to the list
-  products.forEach(product => {
-    const li = document.createElement('li');
-    li.innerHTML = `${product.name} - $${product.price}`;
-
-    // Add delete button for each product
-    const deleteButton = document.createElement('button');
-    deleteButton.innerHTML = 'Delete';
-    deleteButton.addEventListener('click', async () => {
-      await deleteProduct(product.id);
-      await fetchProducts();
-    });
-    li.appendChild(deleteButton);
-
-    // Add update button for each product
-    const updateButton = document.createElement('button');
-    updateButton.innerHTML = 'Update';
-    updateButton.addEventListener('click', () => {
-      updateProductId.value = product.id;
-      updateProductName.value = product.name;
-      updateProductPrice.value = product.price;
-    });
-    li.appendChild(updateButton);
-
-    productList.appendChild(li);
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(produto)
   });
-}
 
-
-// Event listener for Add Product form submit button
-addProductForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  const name = addProductForm.elements['name'].value;
-  const price = addProductForm.elements['price'].value;
-  await addProduct(name, price);
-  addProductForm.reset();
-  await fetchProducts();
+  form.reset();
+  showMensagem('Produto cadastrado com sucesso!');
+  carregarProdutos();
 });
 
-// Function to add a new product
-async function addProduct(name, price) {
-  const response = await fetch('http://localhost:3000/products', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ name, price })
+async function carregarProdutos() {
+  lista.innerHTML = '';
+  const res = await fetch(API_URL);
+  const produtos = await res.json();
+
+  produtos.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'produto';
+    card.innerHTML = `
+      <h3>${p.nome}</h3>
+      <p><strong>Descrição:</strong> ${p.descricao}</p>
+      <p><strong>Preço:</strong> R$${p.preco}</p>
+      <p><strong>Estoque:</strong> ${p.estoque}</p>
+      <div class="botoes">
+        <button onclick="abrirModalEdicao('${p.id}', '${p.nome}', '${p.descricao}', ${p.preco}, ${p.estoque})">Editar</button>
+        <button onclick="deletarProduto('${p.id}')">Deletar</button>
+      </div>
+    `;
+    lista.appendChild(card);
   });
-  return response.json();
 }
 
-// Function to delete a new product
-async function deleteProduct(id) {
-  const response = await fetch('http://localhost:3000/products/' + id, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    //body: JSON.stringify({id})
-  });
-  return response.json();
+async function deletarProduto(id) {
+  await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+  showMensagem('Produto deletado.');
+  carregarProdutos();
 }
 
-// Fetch all products on page load
-fetchProducts();
+function abrirModalEdicao(id, nome, descricao, preco, estoque) {
+  produtoEditando = id;
+  document.getElementById('editNome').value = nome;
+  document.getElementById('editDescricao').value = descricao;
+  document.getElementById('editPreco').value = preco;
+  document.getElementById('editEstoque').value = estoque;
+  document.getElementById('modalEdicao').style.display = 'flex';
+}
+
+document.getElementById('btnSalvarEdicao').onclick = async () => {
+  const produtoAtualizado = {
+    nome: document.getElementById('editNome').value,
+    descricao: document.getElementById('editDescricao').value,
+    preco: parseFloat(document.getElementById('editPreco').value),
+    estoque: parseInt(document.getElementById('editEstoque').value),
+  };
+
+  await fetch(`${API_URL}/${produtoEditando}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(produtoAtualizado)
+  });
+
+  document.getElementById('modalEdicao').style.display = 'none';
+  showMensagem('Produto atualizado com sucesso!');
+  carregarProdutos();
+};
+
+document.getElementById('btnCancelarEdicao').onclick = () => {
+  document.getElementById('modalEdicao').style.display = 'none';
+};
+
+function showMensagem(texto) {
+  mensagem.textContent = texto;
+  setTimeout(() => mensagem.textContent = '', 3000);
+}
+
+carregarProdutos();
